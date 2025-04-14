@@ -3,12 +3,25 @@
     padding: 0;
     box-sizing: border-box;
   }
+
+  .article{
+    background-color: #4e4e4e;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
   
   .container{
     width: 100%;
     height: 100vh;
     overflow-y: scroll;
     scroll-snap-type: y mandatory;
+    scroll-behavior: smooth;
+  }
+
+  .header{
+    text-align: center;
+    margin: 40px;
   }
 
   .slideTextContainer{
@@ -27,8 +40,9 @@
   }
   
   .slides{
-    width: 100%;
     height: 100vh;
+    width: 100%;
+    flex-shrink: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -37,34 +51,96 @@
     gap: 50px;
     color: #fff;
     scroll-snap-align: start;
+    position: relative;
   }
 
   .slides h2{
-    font-size: 70px;
+    font-size: 65px;
     font-weight: 600;
     max-width: 650px;
   }
 
+  .slides h3{
+    font-size: 45px;
+  }
+
   .slides h4{
     display: block;
-    font-size: 30px;
+    font-size: 26px;
     margin-top: 10px;
   }
 
   .slide1{
-    background: linear-gradient(454deg, #4f3eb1, #7f8cec);
+    background: linear-gradient(454deg, #461594, #651FD6);
+  }
+
+  .panelWrapper{
+    display: flex;
+    justify-content: space-around;
+    width: 100%;
+    padding: 0 5%;
+    gap: 50px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .rightPanel{
+    width: 45%;
+  }
+
+  .leftPanel{
+    width: 45%;
   }
 
   .slide2{
-    background: linear-gradient(454deg, #0ccda3, #c1fcd3);
+    background: linear-gradient(454deg, #108DF2, #51ABF6);
+    width: 100%;
   }
 
   .slide3{
-    background: linear-gradient(454deg, #0465c3, #3cd9f8);
+    background: linear-gradient(454deg, #66DBFF, #ADECFF);
   }
 
   .slide4{
-    background: linear-gradient(454deg, #849b5c, #bfffc7);
+    background: linear-gradient(454deg, #FDBB52, #FED89A);
+  }
+
+  .code-block{
+    display: flex;
+    justify-content: center;
+    margin: 30px 0;
+  }
+
+  pre {
+    background: #1e1e1e;
+    color: #dcdcdc;
+    padding: 10px;
+    border-radius: 10px;
+    overflow-x: auto;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 16px;
+    line-height: 1.5;
+    margin-left: 10px;
+    margin-right: auto;
+    width: 40%;
+    display: block;
+  }
+
+  .articleP{
+    padding: 50px;
+    width: 70%;
+    margin: 0 auto;
+    text-align: center;
+    color: white;
+  }
+
+  h3 a {
+    text-decoration: none;
+    color: inherit;
+  }
+  
+  h3 a:hover {
+    text-decoration: underline;
   }
 
   .footer{

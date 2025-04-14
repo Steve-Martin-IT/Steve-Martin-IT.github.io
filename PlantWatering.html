@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Automated Plant Watering System</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-csharp.min.js"></script>
+  </head>
+  <body class="article">
+    <div class="header">
+        <a href="index.html">Back</a>
+        <h1>Automated Plant Watering System</h1>
+        <p class="articleP">
+            I am terrible at keeping plants alive. From the early point of looking at sensors, motors and peripherals for Raspberry pi and some of the basic projects 
+            that could be done I knew I wanted to create something that watered the plants I wanted to grow inside until they were ready to go outside. But I also knew 
+            I wanted to take the basic system I saw in some of the examples and tutorials and build something more substantial and more end to end.
+        </p>
+        <p class="articleP">
+            The first steps were to get the soil sensors set up. As these were sending back an analogue signal these would need to be connected through an Analogue to Digital 
+            converter for the Pi to be able to understand the signal. For this I found the MCP3008 chip which seemed to cover this without needing an additional board and allowing 
+            several connections.
+        </p>
+        <p class="articleP">
+            I planned out the board structure for five capacitive soil sensors like this:
+        </p>
+
+        <p class="articleP">
+            My next point was to look to get the scripts in place to read from the moisture meters. After quite a bit of looking around at a few different sources I eventually put 
+            this script together to read the moisture level. 
+        </p>
+        <div class="code-block">
+        <pre><code class="language-python">
+                import RPi.GPIO as GPIO
+                import datetime
+                import spidev
+                import time
+                import sqlite3
+
+                spi = spidev.SpiDev()
+                spi.open(0,0)
+                spi.max_speed_hz = 1000000
+
+                def readData(channel):
+                    adc = spi.xfer2([1,(8+channel)&lt;&lt;4,0])
+                    data = ((adc[1]&3) &lt;&lt; 8) + adc[2]
+                    return data
+
+                db_path = "/home/steve/Documents/Plants/soil_data.db"
+
+                def insert_reading(sensor_id, moisture_level, moisture_percentage):
+                    conn = sqlite3.connect(db_path)
+                    cursor = conn.cursor()
+                    cursor.execute('''
+                        INSERT INTO soil_moisture (sensor_id, moisture_level, moisture_percentage)
+                        VALUES (?, ?, ?)
+                    ''', (sensor_id, moisture_level, moisture_percentage))
+                    conn.commit()
+                    conn.close()
+
+                GPIO.setwarnings(False)
+                GPIO.setmode(GPIO.BCM)
+
+                moisture1 = readData(0)
+                moisture2 = readData(1)
+                moisture3 = readData(2)
+                moisture4 = readData(3)
+
+                moisture1_percent = round((moisture1 - 330) / 450 * 100, 2)
+                moisture2_percent = round((moisture2 - 330) / 450 * 100, 2)
+                moisture3_percent = round((moisture3 - 330) / 450 * 100, 2)
+                moisture4_percent = round((moisture4 - 330) / 450 * 100, 2)
+
+                insert_reading("Bay 1", moisture1, moisture1_percent)
+                insert_reading("Bay 2", moisture2, moisture2_percent)
+                insert_reading("Bay 3", moisture3, moisture3_percent)
+                insert_reading("Bay 4", moisture4, moisture4_percent)
+
+                f = open("/home/steve/Documents/Plants/Log.txt", "a")  # Open in append mode
+                currentTime = datetime.datetime.now()
+                f.write(str(currentTime) + ":\n")
+                f.write("Detected Moisture in 1: " + str(moisture1_percent) + "\n")
+                f.write("Detected Moisture in 2: " + str(moisture2_percent) + "\n")
+                f.write("Detected Moisture in 3: " + str(moisture3_percent) + "\n")
+                f.write("Detected Moisture in 4: " + str(moisture4_percent) + "\n")
+                f.close()
+
+                GPIO.cleanup()
+            </code></pre>
+            </div>
+            <p class="articleP">
+                This is pulling back the reading from all four of the capacitive soil sensors I had connected, storing all of the results into a database 
+                and then recording all of the details of what was pulled into a log file. I then set up a CRON job to run the script every 15 minutes.
+            </p>
+            <p class="articleP">
+                With this all in place, I left this to run enough times for there to be some data in the database and then set up a simple API server to run 
+                via Flask. As this was staying encapsulated in my home network Flask seemed acceptable for now.
+            </p>
+            <div class="code-block">
+            <pre><code class="language-python">
+            from flask import Flask, jsonify
+            from flask_cors import CORS
+            import sqlite3
+
+            app =  Flask(__name__)
+            CORS(app)
+
+            DB_PATH = "/home/steve/Documents/Plants/soildata.db"
+
+            sensor_tables = [
+            "sensor_readings_1",
+            "sensor_readings_2",
+            "sensor_readings_3",
+            "sensor_readings_4",
+            "sensor_readings_5"
+            ]
+
+            @app.route('/moisture', methods=['GET'])
+            def get_moisture_data():
+            sensor_data = []
+                    
+            try:
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+                        
+            for table in sensor_tables:
+            query = f"SELECT moisture_value, timestamp FROM {table} ORDER by timestamp DESC LIMIT 1"
+            cursor.execute(query)
+            result = cursor.fetchone()
+                            
+            if result:
+            sensor_data.append({
+            "sensor_table": table,
+            "moisture_value": result[0],
+            "timestamp": result[1]
+            })
+                                
+            conn.close()
+            except Exception as e:
+            return jsonify({"error": str(e)}), 500
+                    
+            return jsonify(sensor_data)
+
+            if __name__ == '__main__':
+            app.run(host='0.0.0.0', port=5000, debug=True)
+            </code></pre>
+            </div>
+            <p class="articleP">
+                Now I wanted to put together a basic dashboard that I could look at the moisture level on each of these sensors with and leave enough space to expand 
+                into showing more data over time. As I needed this to run on my PC and it would then retrieve data from the API that I set up, I decided to build this 
+                as a C# WPF application. Getting the general layout in place I created a mainpage and a modelview script.
+            </p>
+            <p class="articleP">
+                With all of that done it looked like this:
+            </p>
+
+            <p class="articleP">
+                The Code Behind it looked like this:
+            </p>
+            <div class="code-block">
+                <pre><code class="language-csharp">
+    using System;
+    using System.Collections.ObjectModel;
+    using System.ComponentModel;
+    using System.Net.Http;
+    using System.Runtime.CompilerServices;
+    using System.Text.Json;
+    using System.Threading.Tasks;
+    using System.Timers;
+    using System.Windows.Media;
+    using LiveChartsCore;
+    using LiveChartsCore.SkiaSharpView;
+    using LiveChartsCore.SkiaSharpView.Drawing.Geometries;
+    using LiveChartsCore.SkiaSharpView.Painting;
+    using SkiaSharp;
+
+    namespace Chinampa
+    {
+    
+        public class DashboardViewModel : INotifyPropertyChanged
+        {
+            private static readonly HttpClient httpClient = new HttpClient();
+            private System.Timers.Timer fetchTimer;
+
+            private double _sensor1Value;
+            public double Sensor1Value
+            {
+                get => _sensor1Value;
+                set
+                {
+                    _sensor1Value = value;
+                    OnPropertyChanged(nameof(Sensor1Value));
+                    OnPropertyChanged(nameof(Sensor1PieData)); // Notify UI
+                }
+            }
+
+            public IEnumerable<ISeries> Sensor1PieData => new ISeries[]
+            {
+                // Sensor1 Pie Slice
+                new PieSeries<double>
+                {
+                    Values = new double[] { Sensor1Value },
+                    Name = "Sensor1 Value",
+                    Fill = new SolidColorPaint(SKColor.Parse("#fc85ba")), // Custom color for Sensor1 slice
+                    InnerRadius = 0.3f
+                },
+                // Remaining Pie Slice (100 - Sensor1)
+                new PieSeries<double>
+                {
+                    Values = new double[] { 100 - Sensor1Value },
+                    Name = "Remaining",
+                    Fill = new SolidColorPaint(SKColor.Parse("#555555")), // Custom color for remaining slice
+                    Stroke = new SolidColorPaint(SKColor.Parse("#00000000")), // Ensure no stroke
+                    InnerRadius = 0.3f
+                }
+            };
+
+            private double _sensor2Value;
+            public double Sensor2Value
+            {
+                get => _sensor2Value;
+                set
+                {
+                    _sensor2Value = value;
+                    OnPropertyChanged(nameof(Sensor2Value));
+                    OnPropertyChanged(nameof(Sensor2PieData)); // Notify UI
+                }
+            }
+
+            public IEnumerable<ISeries> Sensor2PieData => new ISeries[]
+            {
+                // Sensor1 Pie Slice
+                new PieSeries<double>
+                {
+                    Values = new double[] { Sensor2Value },
+                    Name = "Sensor2 Value",
+                    Fill = new SolidColorPaint(SKColor.Parse("#fc85ba")), // Custom color for Sensor1 slice
+                    InnerRadius = 0.3f
+                },
+                // Remaining Pie Slice (100 - Sensor1)
+                new PieSeries<double>
+                {
+                    Values = new double[] { 100 - Sensor2Value },
+                    Name = "Remaining",
+                    Fill = new SolidColorPaint(SKColor.Parse("#555555")), // Custom color for remaining slice
+                    Stroke = new SolidColorPaint(SKColor.Parse("#00000000")), // Ensure no stroke
+                    InnerRadius = 0.3f
+                }
+            };
+
+            private double _sensor3Value;
+            public double Sensor3Value
+            {
+                get => _sensor3Value;
+                set
+                {
+                    _sensor3Value = value;
+                    OnPropertyChanged(nameof(Sensor3Value));
+                    OnPropertyChanged(nameof(Sensor3PieData)); // Notify UI
+                }
+            }
+
+            public IEnumerable<ISeries> Sensor3PieData => new ISeries[]
+            {
+                // Sensor1 Pie Slice
+                new PieSeries<double>
+                {
+                    Values = new double[] { Sensor3Value },
+                    Name = "Sensor2 Value",
+                    Fill = new SolidColorPaint(SKColor.Parse("#fc85ba")), // Custom color for Sensor1 slice
+                    InnerRadius = 0.3f
+                },
+                // Remaining Pie Slice (100 - Sensor1)
+                new PieSeries<double>
+                {
+                    Values = new double[] { 100 - Sensor3Value },
+                    Name = "Remaining",
+                    Fill = new SolidColorPaint(SKColor.Parse("#555555")), // Custom color for remaining slice
+                    Stroke = new SolidColorPaint(SKColor.Parse("#00000000")), // Ensure no stroke
+                    InnerRadius = 0.3f
+                }
+            };
+
+            private double _sensor4Value;
+            public double Sensor4Value
+            {
+                get => _sensor4Value;
+                set
+                {
+                    _sensor4Value = value;
+                    OnPropertyChanged(nameof(Sensor4Value));
+                    OnPropertyChanged(nameof(Sensor4ArcPath)); // Notify UI
+                }
+            }
+
+            private double _sensor5Value;
+            public double Sensor5Value
+            {
+                get => _sensor5Value;
+                set
+                {
+                    _sensor5Value = value;
+                    OnPropertyChanged(nameof(Sensor5Value));
+                    OnPropertyChanged(nameof(Sensor5ArcPath)); // Notify UI
+                }
+            }
+
+            public IEnumerable<double> Sensor1Values => new double[] { Sensor1Value };
+
+            public string Sensor1ArcPath => CalculateArcPath(Sensor1Value / 100);
+            public string Sensor2ArcPath => CalculateArcPath(Sensor2Value / 100);
+            public string Sensor3ArcPath => CalculateArcPath(Sensor3Value / 100);
+            public string Sensor4ArcPath => CalculateArcPath(Sensor4Value / 100);
+            public string Sensor5ArcPath => CalculateArcPath(Sensor5Value / 100);
+
+            
+
+            private string CalculateArcPath(double percentage)
+            {
+                // Map the percentage to an angle range from 0 to 180 degrees
+                double startAngle = Math.PI; // Start at 180° (left side of the circle)
+
+                // Scale percentage to an angle between 0 and Math.PI (180 degrees)
+                double endAngle = startAngle + (Math.PI * percentage); // 180° for 100%
+
+                // Calculate start and end points using cosine and sine functions
+                double startX = 50 + (40 * Math.Cos(startAngle)); // X position of the start point
+                double startY = 50 + (40 * Math.Sin(startAngle)); // Y position of the start point
+                double endX = 50 + (40 * Math.Cos(endAngle)); // X position of the end point
+                double endY = 50 + (40 * Math.Sin(endAngle)); // Y position of the end point
+
+                // Decide if it's a large arc (more than 90 degrees), i.e. when percentage >= 50%
+                int largeArcFlag = percentage >= 0.5 ? 1 : 0;
+
+                // Return the arc path as a string
+                return $"M {startX},{startY} A 40,40 0 {largeArcFlag},1 {endX},{endY}";
+            }
+
+
+
+
+
+            public event PropertyChangedEventHandler PropertyChanged;
+            protected void OnPropertyChanged([CallerMemberName] string name = null) =>
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
+            public DashboardViewModel()
+            {
+                StartTimer();
+            }
+
+            private void StartTimer()
+            {
+                fetchTimer = new System.Timers.Timer(1000); // Check every second
+                fetchTimer.Elapsed += async (sender, e) => await CheckAndFetchData();
+                fetchTimer.Start();
+            }
+
+            private async Task CheckAndFetchData()
+            {
+                int currentMinute = DateTime.Now.Minute;
+                if (currentMinute == 1 || currentMinute == 16 || currentMinute == 31 || currentMinute == 46)
+                {
+                    await FetchSensorData();
+                }
+            }
+
+            private async Task FetchSensorData()
+            {
+                try
+                {
+                    string apiUrl = "http://192.168.1.194:5000/moisture";
+                    var response = await httpClient.GetAsync(apiUrl);
+                    response.EnsureSuccessStatusCode();
+
+                    string responseBody = await response.Content.ReadAsStringAsync();
+                    var sensorData = JsonSerializer.Deserialize<ObservableCollection<SensorReading>>(responseBody);
+
+                    if (sensorData != null && sensorData.Count >= 5)
+                    {
+                        Sensor1Value = sensorData[0].moisture_value;
+                        Sensor2Value = sensorData[1].moisture_value;
+                        Sensor3Value = sensorData[2].moisture_value;
+                        Sensor4Value = sensorData[3].moisture_value;
+                        Sensor5Value = sensorData[4].moisture_value;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error fetching sensor data: {ex.Message}");
+                }
+            }
+            
+
+        }
+
+        
+
+        public class SensorReading
+        {
+            public double moisture_value { get; set; }
+            public string sensor_table { get; set; }
+            public string timestamp { get; set; }
+        }
+
+
+
+    }
+                </code></pre>
+                <pre><code class="language-csharp">
+    using System.Collections.ObjectModel;
+    using System.ComponentModel;
+    using System.Diagnostics;
+    using System.Text;
+    using System.Windows;
+    using System.Windows.Controls;
+    using System.Windows.Data;
+    using System.Windows.Documents;
+    using System.Windows.Input;
+    using System.Windows.Media;
+    using System.Windows.Media.Imaging;
+    using System.Windows.Navigation;
+    using System.Windows.Shapes;
+    using System;
+    using System.Collections.Generic;
+
+    namespace Chinampa
+    {
+        /// <summary>
+        /// Interaction logic for MainWindow.xaml
+        /// </summary>
+        public partial class MainWindow : Window
+        {
+            public MainWindow()
+            {
+                InitializeComponent();
+                DataContext = new DashboardViewModel();
+                DrawGraph();
+            }
+
+            private void DrawGraph()
+            {
+                // Create dummy data for the graph: X represents time (in 15-minute increments) and Y represents value (0-100)
+                var dummyData = new List<KeyValuePair<DateTime, double>>
+            {
+                new KeyValuePair<DateTime, double>(DateTime.Now.AddMinutes(-45), 30),
+                new KeyValuePair<DateTime, double>(DateTime.Now.AddMinutes(-30), 60),
+                new KeyValuePair<DateTime, double>(DateTime.Now.AddMinutes(-15), 80),
+                new KeyValuePair<DateTime, double>(DateTime.Now, 50)
+            };
+
+                double maxValue = 100; // Max Y value for the graph
+                double minValue = 0; // Min Y value for the graph
+
+                double width = graphCanvas.Width;
+                double height = graphCanvas.Height;
+
+                // Create grid lines for X and Y axes
+                CreateGridLines(width, height, maxValue, minValue);
+
+                // Plot data points on the graph
+                for (int i = 0; i < dummyData.Count; i++)
+                {
+                    var dataPoint = dummyData[i];
+                    double x = (i * (width / (dummyData.Count - 1))); // Space out points evenly along the X axis
+                    double y = height - (dataPoint.Value / maxValue * height); // Scale Y value to fit within the canvas height
+
+                    // Create circle for each data point
+                    Ellipse dataPointCircle = new Ellipse
+                    {
+                        Fill = Brushes.Blue,
+                        Width = 10,
+                        Height = 10
+                    };
+
+                    Canvas.SetLeft(dataPointCircle, x - dataPointCircle.Width / 2); // Center circle horizontally
+                    Canvas.SetTop(dataPointCircle, y - dataPointCircle.Height / 2); // Center circle vertically
+                    graphCanvas.Children.Add(dataPointCircle);
+
+                    // Optional: Add text showing the value
+                    TextBlock textBlock = new TextBlock
+                    {
+                        Text = $"{dataPoint.Value}%",
+                        Foreground = Brushes.White,
+                        FontSize = 10
+                    };
+                    Canvas.SetLeft(textBlock, x - 15); // Position text just below the point
+                    Canvas.SetTop(textBlock, y - 20); // Position text above the point
+                    graphCanvas.Children.Add(textBlock);
+                }
+            }
+
+            private void CreateGridLines(double width, double height, double maxValue, double minValue)
+            {
+                // Create vertical lines for X-axis (representing time)
+                for (int i = 0; i < 5; i++) // Example: 5 points in time
+                {
+                    double x = (i * (width / 4)); // Divide width into 5 intervals for time
+                    Line verticalLine = new Line
+                    {
+                        X1 = x,
+                        Y1 = 0,
+                        X2 = x,
+                        Y2 = height,
+                        Stroke = Brushes.Gray,
+                        StrokeThickness = 0.5,
+                        StrokeDashArray = new DoubleCollection { 2, 2 }
+                    };
+                    graphCanvas.Children.Add(verticalLine);
+                }
+
+                // Create horizontal lines for Y-axis (representing value)
+                for (int i = 0; i <= 5; i++) // Example: 5 intervals for value range
+                {
+                    double y = i * (height / 5);
+                    Line horizontalLine = new Line
+                    {
+                        X1 = 0,
+                        Y1 = y,
+                        X2 = width,
+                        Y2 = y,
+                        Stroke = Brushes.Gray,
+                        StrokeThickness = 0.5,
+                        StrokeDashArray = new DoubleCollection { 2, 2 }
+                    };
+                    graphCanvas.Children.Add(horizontalLine);
+                }
+
+            }
+
+
+        }
+
+
+
+    }
+                </code></pre>
+            </div>
+            <p class="articleP">
+                With all of this in place it was time to get the pumps set up. The first stage of this was to build a basic pump script and test this was 
+                working. I put together the below for this.
+            </p>
+            <div class="code-block">
+                <pre><code class="language-python">
+    import RPi.GPIO as GPIO
+    import time
+
+    GPIO.setmode(GPIO.BCM)
+    PUMP_PIN = 4
+
+    GPIO.setup(PUMP_PIN, GPIO.OUT)
+
+    try:
+        print("Turning pump ON!")
+        GPIO.output(PUMP_PIN, GPIO.HIGH)
+        time.sleep(5)
+        print("Turning Pump OFF!")
+        GPIO.output(PUMP_PIN, GPIO.LOW)
+    finally:
+        GPIO.cleanup()
+        print("GPIO cleanup done")
+                </code></pre>
+            </div>
+            <p class="articleP">    
+                The next step for this now is to set up the logic to allow the specific pump to run when moisture meter readings fall below required levels. 
+                After this the Dashboard needs to be extended to  cover more historical tracking and the water reservoir level needs to be monitored to ensure 
+                it doesn’t go below a certain level.
+            </p>
+    </div>
+    
+  </body>
+</html>

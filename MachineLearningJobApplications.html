@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Custom Machine Learning for better Job Applications</title>
+        <link rel="stylesheet" href="style.css">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-csharp.min.js"></script>
+    </head>
+    <body class="article">
+        <div class="header">
+            <a href="index.html">Back</a>
+            <h1>Building a Custom Machine Learning Algorythm to send better Job Applications</h1>
+            <p class="articleP">
+                Facing into looking for a new job is a really uncomfortable thought. I don’t like doing it and I find it very difficult to speak highly of myself 
+                without feeling like I’m being egotistical. But this seems to have also become even more of a challenge as job postings are getting hundreds of 
+                applications and companies using AI filters to trim down these numbers, becoming ubiquitous.
+            </p>
+            <p class="articleP">
+                Some recent advice I got on applying for jobs suggested modifying my CV for every single job application I made to make it tailored to the requirements 
+                for that particular job. Given that I know a few people who have had to apply for more than a hundred jobs in order to get one, that seems like a huge 
+                undertaking.
+            </p>
+            <p class="articleP">
+                However, what I did think this represented was an interesting engineering challenge. Could I scrape a number of sites to find job roles. Build a modular 
+                CV that can be assembled to best represent me for that role and perhaps even give me a rating of how exactly I am matched to the role? 
+            </p>
+            <p class="articleP">
+                So the first step was to get into Web scraping using Python and identify a site to start reviewing for potential job roles. One of the big challenges for 
+                that would be authentication and ensuring that we could pass this authentication and secondly to avoid rate limiting or any other service trying to stop web 
+                crawling. With all of that in mind the first place I decided to start reviewing for this was a site called Welcome to the Jungle; formerly known as Otta.
+            </p>
+            <p class="articleP">
+                With that decided, I also needed to put together some basic infrastructure to be handle what is found in the web scraping activity and to keep this stored 
+                somewhere. In this regard I felt it best to store overall key data for each job into a table in a database and then to extract the entire advert and keep this 
+                stored as text in a local Minio S3 bucket. This would allow me to be able to reference the entire document at any point and to be able to review anything else 
+                I felt needed to go into the database thereafter.
+            </p>
+        </div>
+    </body>
+</html>
+

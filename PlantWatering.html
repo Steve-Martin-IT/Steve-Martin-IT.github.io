@@ -23,10 +23,11 @@
             converter for the Pi to be able to understand the signal. For this I found the MCP3008 chip which seemed to cover this without needing an additional board and allowing 
             several connections.
         </p>
+        <img class="photo" src="img/Plants.jpg">
         <p class="articleP">
             I planned out the board structure for five capacitive soil sensors like this:
         </p>
-
+        <img src="">
         <p class="articleP">
             My next point was to look to get the scripts in place to read from the moisture meters. After quite a bit of looking around at a few different sources I eventually put 
             this script together to read the moisture level. 
@@ -155,259 +156,259 @@
             <p class="articleP">
                 With all of that done it looked like this:
             </p>
-
+            <img class="screenshot" src="img/Dashboard.png">
             <p class="articleP">
                 The Code Behind it looked like this:
             </p>
             <div class="code-block">
                 <pre><code class="language-csharp">
-    using System;
-    using System.Collections.ObjectModel;
-    using System.ComponentModel;
-    using System.Net.Http;
-    using System.Runtime.CompilerServices;
-    using System.Text.Json;
-    using System.Threading.Tasks;
-    using System.Timers;
-    using System.Windows.Media;
-    using LiveChartsCore;
-    using LiveChartsCore.SkiaSharpView;
-    using LiveChartsCore.SkiaSharpView.Drawing.Geometries;
-    using LiveChartsCore.SkiaSharpView.Painting;
-    using SkiaSharp;
+            using System;
+            using System.Collections.ObjectModel;
+            using System.ComponentModel;
+            using System.Net.Http;
+            using System.Runtime.CompilerServices;
+            using System.Text.Json;
+            using System.Threading.Tasks;
+            using System.Timers;
+            using System.Windows.Media;
+            using LiveChartsCore;
+            using LiveChartsCore.SkiaSharpView;
+            using LiveChartsCore.SkiaSharpView.Drawing.Geometries;
+            using LiveChartsCore.SkiaSharpView.Painting;
+            using SkiaSharp;
 
-    namespace Chinampa
-    {
-    
-        public class DashboardViewModel : INotifyPropertyChanged
-        {
-            private static readonly HttpClient httpClient = new HttpClient();
-            private System.Timers.Timer fetchTimer;
-
-            private double _sensor1Value;
-            public double Sensor1Value
+            namespace Chinampa
             {
-                get => _sensor1Value;
-                set
-                {
-                    _sensor1Value = value;
-                    OnPropertyChanged(nameof(Sensor1Value));
-                    OnPropertyChanged(nameof(Sensor1PieData)); // Notify UI
-                }
-            }
-
-            public IEnumerable<ISeries> Sensor1PieData => new ISeries[]
-            {
-                // Sensor1 Pie Slice
-                new PieSeries<double>
-                {
-                    Values = new double[] { Sensor1Value },
-                    Name = "Sensor1 Value",
-                    Fill = new SolidColorPaint(SKColor.Parse("#fc85ba")), // Custom color for Sensor1 slice
-                    InnerRadius = 0.3f
-                },
-                // Remaining Pie Slice (100 - Sensor1)
-                new PieSeries<double>
-                {
-                    Values = new double[] { 100 - Sensor1Value },
-                    Name = "Remaining",
-                    Fill = new SolidColorPaint(SKColor.Parse("#555555")), // Custom color for remaining slice
-                    Stroke = new SolidColorPaint(SKColor.Parse("#00000000")), // Ensure no stroke
-                    InnerRadius = 0.3f
-                }
-            };
-
-            private double _sensor2Value;
-            public double Sensor2Value
-            {
-                get => _sensor2Value;
-                set
-                {
-                    _sensor2Value = value;
-                    OnPropertyChanged(nameof(Sensor2Value));
-                    OnPropertyChanged(nameof(Sensor2PieData)); // Notify UI
-                }
-            }
-
-            public IEnumerable<ISeries> Sensor2PieData => new ISeries[]
-            {
-                // Sensor1 Pie Slice
-                new PieSeries<double>
-                {
-                    Values = new double[] { Sensor2Value },
-                    Name = "Sensor2 Value",
-                    Fill = new SolidColorPaint(SKColor.Parse("#fc85ba")), // Custom color for Sensor1 slice
-                    InnerRadius = 0.3f
-                },
-                // Remaining Pie Slice (100 - Sensor1)
-                new PieSeries<double>
-                {
-                    Values = new double[] { 100 - Sensor2Value },
-                    Name = "Remaining",
-                    Fill = new SolidColorPaint(SKColor.Parse("#555555")), // Custom color for remaining slice
-                    Stroke = new SolidColorPaint(SKColor.Parse("#00000000")), // Ensure no stroke
-                    InnerRadius = 0.3f
-                }
-            };
-
-            private double _sensor3Value;
-            public double Sensor3Value
-            {
-                get => _sensor3Value;
-                set
-                {
-                    _sensor3Value = value;
-                    OnPropertyChanged(nameof(Sensor3Value));
-                    OnPropertyChanged(nameof(Sensor3PieData)); // Notify UI
-                }
-            }
-
-            public IEnumerable<ISeries> Sensor3PieData => new ISeries[]
-            {
-                // Sensor1 Pie Slice
-                new PieSeries<double>
-                {
-                    Values = new double[] { Sensor3Value },
-                    Name = "Sensor2 Value",
-                    Fill = new SolidColorPaint(SKColor.Parse("#fc85ba")), // Custom color for Sensor1 slice
-                    InnerRadius = 0.3f
-                },
-                // Remaining Pie Slice (100 - Sensor1)
-                new PieSeries<double>
-                {
-                    Values = new double[] { 100 - Sensor3Value },
-                    Name = "Remaining",
-                    Fill = new SolidColorPaint(SKColor.Parse("#555555")), // Custom color for remaining slice
-                    Stroke = new SolidColorPaint(SKColor.Parse("#00000000")), // Ensure no stroke
-                    InnerRadius = 0.3f
-                }
-            };
-
-            private double _sensor4Value;
-            public double Sensor4Value
-            {
-                get => _sensor4Value;
-                set
-                {
-                    _sensor4Value = value;
-                    OnPropertyChanged(nameof(Sensor4Value));
-                    OnPropertyChanged(nameof(Sensor4ArcPath)); // Notify UI
-                }
-            }
-
-            private double _sensor5Value;
-            public double Sensor5Value
-            {
-                get => _sensor5Value;
-                set
-                {
-                    _sensor5Value = value;
-                    OnPropertyChanged(nameof(Sensor5Value));
-                    OnPropertyChanged(nameof(Sensor5ArcPath)); // Notify UI
-                }
-            }
-
-            public IEnumerable<double> Sensor1Values => new double[] { Sensor1Value };
-
-            public string Sensor1ArcPath => CalculateArcPath(Sensor1Value / 100);
-            public string Sensor2ArcPath => CalculateArcPath(Sensor2Value / 100);
-            public string Sensor3ArcPath => CalculateArcPath(Sensor3Value / 100);
-            public string Sensor4ArcPath => CalculateArcPath(Sensor4Value / 100);
-            public string Sensor5ArcPath => CalculateArcPath(Sensor5Value / 100);
-
             
-
-            private string CalculateArcPath(double percentage)
-            {
-                // Map the percentage to an angle range from 0 to 180 degrees
-                double startAngle = Math.PI; // Start at 180° (left side of the circle)
-
-                // Scale percentage to an angle between 0 and Math.PI (180 degrees)
-                double endAngle = startAngle + (Math.PI * percentage); // 180° for 100%
-
-                // Calculate start and end points using cosine and sine functions
-                double startX = 50 + (40 * Math.Cos(startAngle)); // X position of the start point
-                double startY = 50 + (40 * Math.Sin(startAngle)); // Y position of the start point
-                double endX = 50 + (40 * Math.Cos(endAngle)); // X position of the end point
-                double endY = 50 + (40 * Math.Sin(endAngle)); // Y position of the end point
-
-                // Decide if it's a large arc (more than 90 degrees), i.e. when percentage >= 50%
-                int largeArcFlag = percentage >= 0.5 ? 1 : 0;
-
-                // Return the arc path as a string
-                return $"M {startX},{startY} A 40,40 0 {largeArcFlag},1 {endX},{endY}";
-            }
-
-
-
-
-
-            public event PropertyChangedEventHandler PropertyChanged;
-            protected void OnPropertyChanged([CallerMemberName] string name = null) =>
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-
-            public DashboardViewModel()
-            {
-                StartTimer();
-            }
-
-            private void StartTimer()
-            {
-                fetchTimer = new System.Timers.Timer(1000); // Check every second
-                fetchTimer.Elapsed += async (sender, e) => await CheckAndFetchData();
-                fetchTimer.Start();
-            }
-
-            private async Task CheckAndFetchData()
-            {
-                int currentMinute = DateTime.Now.Minute;
-                if (currentMinute == 1 || currentMinute == 16 || currentMinute == 31 || currentMinute == 46)
+                public class DashboardViewModel : INotifyPropertyChanged
                 {
-                    await FetchSensorData();
-                }
-            }
+                    private static readonly HttpClient httpClient = new HttpClient();
+                    private System.Timers.Timer fetchTimer;
 
-            private async Task FetchSensorData()
-            {
-                try
-                {
-                    string apiUrl = "http://192.168.1.194:5000/moisture";
-                    var response = await httpClient.GetAsync(apiUrl);
-                    response.EnsureSuccessStatusCode();
-
-                    string responseBody = await response.Content.ReadAsStringAsync();
-                    var sensorData = JsonSerializer.Deserialize<ObservableCollection<SensorReading>>(responseBody);
-
-                    if (sensorData != null && sensorData.Count >= 5)
+                    private double _sensor1Value;
+                    public double Sensor1Value
                     {
-                        Sensor1Value = sensorData[0].moisture_value;
-                        Sensor2Value = sensorData[1].moisture_value;
-                        Sensor3Value = sensorData[2].moisture_value;
-                        Sensor4Value = sensorData[3].moisture_value;
-                        Sensor5Value = sensorData[4].moisture_value;
+                        get => _sensor1Value;
+                        set
+                        {
+                            _sensor1Value = value;
+                            OnPropertyChanged(nameof(Sensor1Value));
+                            OnPropertyChanged(nameof(Sensor1PieData)); 
+                        }
                     }
+
+                    public IEnumerable<ISeries> Sensor1PieData => new ISeries[]
+                    {
+                        
+                        new PieSeries<double>
+                        {
+                            Values = new double[] { Sensor1Value },
+                            Name = "Sensor1 Value",
+                            Fill = new SolidColorPaint(SKColor.Parse("#fc85ba")), 
+                            InnerRadius = 0.3f
+                        },
+                        
+                        new PieSeries<double>
+                        {
+                            Values = new double[] { 100 - Sensor1Value },
+                            Name = "Remaining",
+                            Fill = new SolidColorPaint(SKColor.Parse("#555555")), 
+                            Stroke = new SolidColorPaint(SKColor.Parse("#00000000")), 
+                            InnerRadius = 0.3f
+                        }
+                    };
+
+                    private double _sensor2Value;
+                    public double Sensor2Value
+                    {
+                        get => _sensor2Value;
+                        set
+                        {
+                            _sensor2Value = value;
+                            OnPropertyChanged(nameof(Sensor2Value));
+                            OnPropertyChanged(nameof(Sensor2PieData)); 
+                        }
+                    }
+
+                    public IEnumerable<ISeries> Sensor2PieData => new ISeries[]
+                    {
+                        // Sensor1 Pie Slice
+                        new PieSeries<double>
+                        {
+                            Values = new double[] { Sensor2Value },
+                            Name = "Sensor2 Value",
+                            Fill = new SolidColorPaint(SKColor.Parse("#fc85ba")), 
+                            InnerRadius = 0.3f
+                        },
+                        // Remaining Pie Slice (100 - Sensor1)
+                        new PieSeries<double>
+                        {
+                            Values = new double[] { 100 - Sensor2Value },
+                            Name = "Remaining",
+                            Fill = new SolidColorPaint(SKColor.Parse("#555555")), 
+                            Stroke = new SolidColorPaint(SKColor.Parse("#00000000")), 
+                            InnerRadius = 0.3f
+                        }
+                    };
+
+                    private double _sensor3Value;
+                    public double Sensor3Value
+                    {
+                        get => _sensor3Value;
+                        set
+                        {
+                            _sensor3Value = value;
+                            OnPropertyChanged(nameof(Sensor3Value));
+                            OnPropertyChanged(nameof(Sensor3PieData)); // Notify UI
+                        }
+                    }
+
+                    public IEnumerable<ISeries> Sensor3PieData => new ISeries[]
+                    {
+                        
+                        new PieSeries<double>
+                        {
+                            Values = new double[] { Sensor3Value },
+                            Name = "Sensor2 Value",
+                            Fill = new SolidColorPaint(SKColor.Parse("#fc85ba")), 
+                            InnerRadius = 0.3f
+                        },
+                        
+                        new PieSeries<double>
+                        {
+                            Values = new double[] { 100 - Sensor3Value },
+                            Name = "Remaining",
+                            Fill = new SolidColorPaint(SKColor.Parse("#555555")), 
+                            Stroke = new SolidColorPaint(SKColor.Parse("#00000000")), 
+                            InnerRadius = 0.3f
+                        }
+                    };
+
+                    private double _sensor4Value;
+                    public double Sensor4Value
+                    {
+                        get => _sensor4Value;
+                        set
+                        {
+                            _sensor4Value = value;
+                            OnPropertyChanged(nameof(Sensor4Value));
+                            OnPropertyChanged(nameof(Sensor4ArcPath)); // Notify UI
+                        }
+                    }
+
+                    private double _sensor5Value;
+                    public double Sensor5Value
+                    {
+                        get => _sensor5Value;
+                        set
+                        {
+                            _sensor5Value = value;
+                            OnPropertyChanged(nameof(Sensor5Value));
+                            OnPropertyChanged(nameof(Sensor5ArcPath)); // Notify UI
+                        }
+                    }
+
+                    public IEnumerable<double> Sensor1Values => new double[] { Sensor1Value };
+
+                    public string Sensor1ArcPath => CalculateArcPath(Sensor1Value / 100);
+                    public string Sensor2ArcPath => CalculateArcPath(Sensor2Value / 100);
+                    public string Sensor3ArcPath => CalculateArcPath(Sensor3Value / 100);
+                    public string Sensor4ArcPath => CalculateArcPath(Sensor4Value / 100);
+                    public string Sensor5ArcPath => CalculateArcPath(Sensor5Value / 100);
+
+                    
+
+                    private string CalculateArcPath(double percentage)
+                    {
+                        
+                        double startAngle = Math.PI; 
+
+                        
+                        double endAngle = startAngle + (Math.PI * percentage); 
+
+                        
+                        double startX = 50 + (40 * Math.Cos(startAngle)); 
+                        double startY = 50 + (40 * Math.Sin(startAngle)); 
+                        double endX = 50 + (40 * Math.Cos(endAngle)); 
+                        double endY = 50 + (40 * Math.Sin(endAngle)); 
+
+                        
+                        int largeArcFlag = percentage >= 0.5 ? 1 : 0;
+
+                        
+                        return $"M {startX},{startY} A 40,40 0 {largeArcFlag},1 {endX},{endY}";
+                    }
+
+
+
+
+
+                    public event PropertyChangedEventHandler PropertyChanged;
+                    protected void OnPropertyChanged([CallerMemberName] string name = null) =>
+                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
+                    public DashboardViewModel()
+                    {
+                        StartTimer();
+                    }
+
+                    private void StartTimer()
+                    {
+                        fetchTimer = new System.Timers.Timer(1000); 
+                        fetchTimer.Elapsed += async (sender, e) => await CheckAndFetchData();
+                        fetchTimer.Start();
+                    }
+
+                    private async Task CheckAndFetchData()
+                    {
+                        int currentMinute = DateTime.Now.Minute;
+                        if (currentMinute == 1 || currentMinute == 16 || currentMinute == 31 || currentMinute == 46)
+                        {
+                            await FetchSensorData();
+                        }
+                    }
+
+                    private async Task FetchSensorData()
+                    {
+                        try
+                        {
+                            string apiUrl = "http://192.168.1.194:5000/moisture";
+                            var response = await httpClient.GetAsync(apiUrl);
+                            response.EnsureSuccessStatusCode();
+
+                            string responseBody = await response.Content.ReadAsStringAsync();
+                            var sensorData = JsonSerializer.Deserialize<ObservableCollection<SensorReading>>(responseBody);
+
+                            if (sensorData != null && sensorData.Count >= 5)
+                            {
+                                Sensor1Value = sensorData[0].moisture_value;
+                                Sensor2Value = sensorData[1].moisture_value;
+                                Sensor3Value = sensorData[2].moisture_value;
+                                Sensor4Value = sensorData[3].moisture_value;
+                                Sensor5Value = sensorData[4].moisture_value;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Error fetching sensor data: {ex.Message}");
+                        }
+                    }
+                    
+
                 }
-                catch (Exception ex)
+
+                
+
+                public class SensorReading
                 {
-                    Console.WriteLine($"Error fetching sensor data: {ex.Message}");
+                    public double moisture_value { get; set; }
+                    public string sensor_table { get; set; }
+                    public string timestamp { get; set; }
                 }
+
+
+
             }
-            
-
-        }
-
-        
-
-        public class SensorReading
-        {
-            public double moisture_value { get; set; }
-            public string sensor_table { get; set; }
-            public string timestamp { get; set; }
-        }
-
-
-
-    }
                 </code></pre>
                 <pre><code class="language-csharp">
     using System.Collections.ObjectModel;
@@ -429,7 +430,7 @@
     namespace Chinampa
     {
         /// <summary>
-        /// Interaction logic for MainWindow.xaml
+        
         /// </summary>
         public partial class MainWindow : Window
         {
@@ -442,7 +443,7 @@
 
             private void DrawGraph()
             {
-                // Create dummy data for the graph: X represents time (in 15-minute increments) and Y represents value (0-100)
+                
                 var dummyData = new List<KeyValuePair<DateTime, double>>
             {
                 new KeyValuePair<DateTime, double>(DateTime.Now.AddMinutes(-45), 30),
@@ -451,8 +452,8 @@
                 new KeyValuePair<DateTime, double>(DateTime.Now, 50)
             };
 
-                double maxValue = 100; // Max Y value for the graph
-                double minValue = 0; // Min Y value for the graph
+                double maxValue = 100; 
+                double minValue = 0; 
 
                 double width = graphCanvas.Width;
                 double height = graphCanvas.Height;
@@ -464,8 +465,8 @@
                 for (int i = 0; i < dummyData.Count; i++)
                 {
                     var dataPoint = dummyData[i];
-                    double x = (i * (width / (dummyData.Count - 1))); // Space out points evenly along the X axis
-                    double y = height - (dataPoint.Value / maxValue * height); // Scale Y value to fit within the canvas height
+                    double x = (i * (width / (dummyData.Count - 1))); 
+                    double y = height - (dataPoint.Value / maxValue * height); 
 
                     // Create circle for each data point
                     Ellipse dataPointCircle = new Ellipse
@@ -475,8 +476,8 @@
                         Height = 10
                     };
 
-                    Canvas.SetLeft(dataPointCircle, x - dataPointCircle.Width / 2); // Center circle horizontally
-                    Canvas.SetTop(dataPointCircle, y - dataPointCircle.Height / 2); // Center circle vertically
+                    Canvas.SetLeft(dataPointCircle, x - dataPointCircle.Width / 2); 
+                    Canvas.SetTop(dataPointCircle, y - dataPointCircle.Height / 2); 
                     graphCanvas.Children.Add(dataPointCircle);
 
                     // Optional: Add text showing the value
@@ -486,8 +487,8 @@
                         Foreground = Brushes.White,
                         FontSize = 10
                     };
-                    Canvas.SetLeft(textBlock, x - 15); // Position text just below the point
-                    Canvas.SetTop(textBlock, y - 20); // Position text above the point
+                    Canvas.SetLeft(textBlock, x - 15); 
+                    Canvas.SetTop(textBlock, y - 20); 
                     graphCanvas.Children.Add(textBlock);
                 }
             }
@@ -495,9 +496,9 @@
             private void CreateGridLines(double width, double height, double maxValue, double minValue)
             {
                 // Create vertical lines for X-axis (representing time)
-                for (int i = 0; i < 5; i++) // Example: 5 points in time
+                for (int i = 0; i < 5; i++) /
                 {
-                    double x = (i * (width / 4)); // Divide width into 5 intervals for time
+                    double x = (i * (width / 4)); 
                     Line verticalLine = new Line
                     {
                         X1 = x,
@@ -512,7 +513,7 @@
                 }
 
                 // Create horizontal lines for Y-axis (representing value)
-                for (int i = 0; i <= 5; i++) // Example: 5 intervals for value range
+                for (int i = 0; i <= 5; i++) 
                 {
                     double y = i * (height / 5);
                     Line horizontalLine = new Line

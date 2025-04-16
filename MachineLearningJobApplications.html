@@ -11,32 +11,112 @@
     </head>
     <body class="article">
         <div class="header">
-            <a href="index.html">Back</a>
+            <a class="back" href="index.html">Back</a>
             <h1>Building a Custom Machine Learning Algorythm to send better Job Applications</h1>
             <p class="articleP">
                 Facing into looking for a new job is a really uncomfortable thought. I don’t like doing it and I find it very difficult to speak highly of myself 
                 without feeling like I’m being egotistical. But this seems to have also become even more of a challenge as job postings are getting hundreds of 
-                applications and companies using AI filters to trim down these numbers, becoming ubiquitous.
-            </p>
-            <p class="articleP">
-                Some recent advice I got on applying for jobs suggested modifying my CV for every single job application I made to make it tailored to the requirements 
-                for that particular job. Given that I know a few people who have had to apply for more than a hundred jobs in order to get one, that seems like a huge 
-                undertaking.
+                applications and companies using AI filters to trim down these numbers, becoming ubiquitous. Some recent advice I got on applying for jobs suggested 
+                modifying my CV for every single job application I made to make it tailored to the requirements for that particular job. Given that I know a few 
+                people who have had to apply for more than a hundred jobs in order to get one, that seems like a huge undertaking.
             </p>
             <p class="articleP">
                 However, what I did think this represented was an interesting engineering challenge. Could I scrape a number of sites to find job roles. Build a modular 
                 CV that can be assembled to best represent me for that role and perhaps even give me a rating of how exactly I am matched to the role? 
-            </p>
-            <p class="articleP">
                 So the first step was to get into Web scraping using Python and identify a site to start reviewing for potential job roles. One of the big challenges for 
                 that would be authentication and ensuring that we could pass this authentication and secondly to avoid rate limiting or any other service trying to stop web 
-                crawling. With all of that in mind the first place I decided to start reviewing for this was a site called Welcome to the Jungle; formerly known as Otta.
+                crawling. With all of that in mind the first place I decided to start reviewing for this was a site called Welcome to the Jungle; formerly known as Otta. 
             </p>
             <p class="articleP">
-                With that decided, I also needed to put together some basic infrastructure to be handle what is found in the web scraping activity and to keep this stored 
-                somewhere. In this regard I felt it best to store overall key data for each job into a table in a database and then to extract the entire advert and keep this 
-                stored as text in a local Minio S3 bucket. This would allow me to be able to reference the entire document at any point and to be able to review anything else 
-                I felt needed to go into the database thereafter.
+                The first point was to try and run a script that could pull out the job adverts. This was going to take a bit more than what I had learnt in a course about web scraping
+                so I had some time researching how this could be done in the imediate.
+            </p>
+            <pre><code class="language-csharp">
+            import time
+            import random
+            import re
+            import json
+            from selenium import webdriver
+            from selenium.webdriver.common.by import By
+            from bs4 import BeautifulSoup
+            import undetected_chromedriver as uc
+
+            def human_delay(min_seconds=1.5, max_seconds=3.5):
+                time.sleep(random.uniform(min_seconds, max_seconds))
+
+            def init_driver():
+                options = uc.ChromeOptions()
+                options.headless = True
+                driver = uc.Chrome(options=options)
+                return driver
+
+            def load_all_companies(driver, url="https://app.welcometothejungle.com/companies"):
+                driver.get(url)
+                time.sleep(5)
+
+                last_height = driver.execute_script("return document.body.scrollHeight")
+                scroll_attempts = 0
+
+                while scroll_attempts < 20:
+                    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                    time.sleep(random.uniform(1, 2.5))
+                    new_height = driver.execute_script("return document.body.scrollHeight")
+                    if new_height == last_height:
+                        scroll_attempts += 1
+                    else:
+                        scroll_attempts = 0
+                    last_height = new_height
+
+                soup = BeautifulSoup(driver.page_source, "html.parser")
+                links = set()
+                for a in soup.find_all("a", href=True):
+                    href = a["href"]
+                    if href.startswith("/companies/") and "/jobs" not in href:
+                        full_link = "https://app.welcometothejungle.com" + href
+                        links.add(full_link)
+                return list(links)
+
+            def extract_job_links(driver, company_url):
+                driver.get(company_url)
+                time.sleep(3)
+                soup = BeautifulSoup(driver.page_source, "html.parser")
+                job_links = set()
+
+                for a in soup.find_all("a", href=True):
+                    href = a["href"]
+                    if re.match(r"^/jobs/[a-zA-Z0-9]{8}$", href):
+                        job_links.add("https://app.welcometothejungle.com" + href)
+                return list(job_links)
+
+            def save_to_json(data, filename="job_links.json"):
+                with open(filename, "w") as f:
+                    json.dump(data, f, indent=2)
+
+            if __name__ == "__main__":
+                driver = init_driver()
+
+                try:
+                    print("Loading all companies...")
+                    company_links = load_all_companies(driver)
+                    print(f"Found {len(company_links)} companies.")
+
+                    results = {}
+                    for idx, company_url in enumerate(company_links):
+                        print(f"[{idx + 1}/{len(company_links)}] Scraping: {company_url}")
+                        job_links = extract_job_links(driver, company_url)
+                        if job_links:
+                            results[company_url] = job_links
+                        human_delay()
+
+                    print(f"Saving {sum(len(v) for v in results.values())} job links...")
+                    save_to_json(results)
+
+                finally:
+                    driver.quit()
+                    print("Done.")
+            </code></pre>
+            <p class="articleP">
+                
             </p>
         </div>
     </body>

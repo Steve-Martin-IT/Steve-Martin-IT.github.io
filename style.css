@@ -150,6 +150,12 @@
     color: white;
   }
 
+  .back{
+    color: white;
+    width: 20%;
+    margin: 10px;
+  }
+
   h3 a {
     text-decoration: none;
     color: inherit;

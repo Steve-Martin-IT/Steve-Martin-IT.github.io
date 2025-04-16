@@ -11,23 +11,267 @@
     </head>
     <body class="article">
         <div class="header">
-            <a href="index.html">Back</a>
+            <a class="back" href="index.html">Back</a>
             <h1 class="ArticleTitle">Hearing Screener Application</h1>
             <p class="articleP">
                 In my role as an Application Support Lead I faced into a significant unfinished task from a project. A transition had been done to take 
-                stores away from using iPads and to instead use Windows based HP tablets. 
-            </p>
-            <p class="articleP">
-                As part of this project the significant majority of applications that were being used on the iPads were rebuilt for Windows. But, as the 
+                stores away from using iPads and to instead use Windows based HP tablets. As part of this project the significant majority of applications 
+                that were being used on the iPads were rebuilt for Windows. But, as the 
                 project was deemed to be an “optical” project it did not tackle applications that were being used for audiology purposes.
             </p>
             <p class="articleP">
                 As the company paid a per device fee for the devices on the Mobile Device Management platform, this left my team having to pay towards a 
-                significant number of iPads that were being left in stores to facilitate two applications.
+                significant number of iPads that were being left in stores to facilitate two applications. My line manager challenged me to come up with 
+                solutions for how we could move away from these iPads in order to save this money. So, I began 
+                trying to build an equivalent application as a Windows WPF application, this was the basic flow design.
             </p>
+
             <p class="articleP">
-                My line manager challenged me to come up with solutions for how we could move away from these iPads in order to save this money. So, I began 
-                trying to build an equivalent application as a Windows WPF application.
+                This needed to be able to store a limited amount of data about each use from a variety of different sites, so this neeeded to be linked to some 
+                form of data storage.
+            </p>
+            
+            <p class="articleP">
+                The home screen needed to be able to request a store code and ensure one was stored between sessions so this was presented if no log file was found 
+                and then stored after. Other than this the Home screen served to be a stage to be able to hand the tablet from a store user to a customer and ensure they are setup
+                ready for the test.
+            </p>
+            <pre><code class="language-csharp">
+            using Azure.Storage.Blobs.Models;
+            using Azure.Storage.Blobs;
+            using Azure;
+            using System;
+            using System.ComponentModel;
+            using System.Diagnostics;
+            using System.IO;
+            using System.Text.RegularExpressions;
+            using System.Threading.Tasks;
+            using System.Windows;
+            
+            namespace Hearing_Screener
+            
+            {
+                public partial class MainWindow : Window
+                {
+                    private string blobUrl = "https://storagelocation.net/data"; 
+                    private string sasToken = "SAS Token";
+            
+                    public string StoreCode { get; set; }
+                    
+                    private bool _isStoreCodeRequired;
+                    
+                    
+                    public bool IsStoreCodeRequired
+                    {
+                        get { return _isStoreCodeRequired; }
+                        set
+                        {
+                            _isStoreCodeRequired = value;
+                            OnPropertyChanged(nameof(IsStoreCodeRequired));
+                        }
+                    }
+            
+                    
+            
+                    
+                    public MainWindow()
+                    {
+                        InitializeComponent();
+                        this.Loaded += MainWindow_Loaded;
+                        DataContext = this;
+            
+                        StoreCode = LoadStoreCode(); 
+                        IsStoreCodeRequired = string.IsNullOrEmpty(StoreCode);
+            
+                        if (IsStoreCodeRequired)
+                        {
+                            StoreCodeTextBox.Visibility = Visibility.Visible;
+                            SubmitStoreCodeButton.Visibility = Visibility.Visible;
+                            StoreCodeLabel.Visibility = Visibility.Visible;
+                            StartTestButton.Visibility = Visibility.Collapsed;
+                            CurrentStoreCodeLabel.Visibility = Visibility.Collapsed;
+                            CurrentStoreCodeTextBlock.Visibility = Visibility.Collapsed;
+                        }
+                        else
+                        {
+                            
+                            StoreCodeTextBox.Visibility = Visibility.Collapsed;
+                            SubmitStoreCodeButton.Visibility = Visibility.Collapsed;
+                            StoreCodeLabel.Visibility = Visibility.Collapsed;
+                            StartTestButton.Visibility = Visibility.Visible;
+                            CurrentStoreCodeLabel.Visibility = Visibility.Visible;
+                            CurrentStoreCodeTextBlock.Visibility = Visibility.Visible;
+                        }
+                    }
+            
+                    private async Task ReadBlobFileAsync(string blobName)
+                    {
+                        try
+                        {
+                            Uri blobUri = new Uri($"{blobUrl}/{blobName}?{sasToken}");
+                            Debug.WriteLine($"Blob URI: {blobUri}");
+            
+                            
+                            BlobClient blobClient = new BlobClient(blobUri);
+                            Debug.WriteLine("BlobClient created successfully.");
+            
+                            BlobDownloadInfo download = await blobClient.DownloadAsync();
+            
+                            using (StreamReader reader = new StreamReader(download.Content))
+                            {
+                                string content = await reader.ReadToEndAsync();
+                                Debug.WriteLine("Blob content:");
+                                Debug.WriteLine(content);
+                            }
+            
+                            Debug.WriteLine("Blob read successfully.");
+                        }
+                        catch (RequestFailedException ex)
+                        {
+                            Debug.WriteLine($"Request failed: {ex.Message}, ErrorCode: {ex.ErrorCode}, Status: {ex.Status}");
+                            MessageBox.Show($"An error occurred while reading the blob: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"An unexpected error occurred: {ex.Message}");
+                            MessageBox.Show($"An unexpected error occurred: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                        }
+                        finally
+                        {
+                            Debug.WriteLine("Exiting the ReadBlobFileAsync method.");
+                        }
+                    }
+            
+                    private void SubmitButton_Click(object sender, RoutedEventArgs e)
+                    {
+                        if (!Regex.IsMatch(StoreCode, @"^\d{4}$"))
+                        {
+                            MessageBox.Show("Store code must be four digits long.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                            return;
+                        }
+            
+                        SaveStoreCode(StoreCode);
+            
+                    }
+            
+                    private string LoadStoreCode()
+                    {
+                        string configFilePath = "C://Users/Public/AppData/Local/Screener/config.txt";
+            
+                        if (File.Exists(configFilePath))
+                        {
+                            return File.ReadAllText(configFilePath);
+                        }
+                        else
+                        {
+                            return string.Empty;
+                        }
+                    }
+            
+                    private void SaveStoreCode(string storeCode)
+                    {
+                        string configFilePath = "C://Users/Public/AppData/Local/Screener/config.txt";
+                        string directoryPath = Path.GetDirectoryName(configFilePath);
+            
+                        try
+                        {
+                            if (!Directory.Exists(directoryPath))
+                            {
+                                Directory.CreateDirectory(directoryPath);
+                            }
+            
+                            using (StreamWriter writer = new StreamWriter(configFilePath))
+                            {
+                                writer.WriteLine(storeCode);
+                            }
+            
+                            StoreCodeTextBox.Visibility = Visibility.Collapsed;
+                            SubmitStoreCodeButton.Visibility = Visibility.Collapsed;
+                            StoreCodeLabel.Visibility = Visibility.Collapsed;
+                            StartTestButton.Visibility = Visibility.Visible;
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show($"Error saving store code: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                        }
+                    }
+            
+                    private void ConfirmAndDeleteConfigFile()
+                    {
+                        MessageBoxResult result = MessageBox.Show(
+                            "Are you sure you want to change the store code? This will restart the application to do so.",
+                            "Confirm Store Code Change",
+                            MessageBoxButton.OKCancel,
+                            MessageBoxImage.Question
+                        );
+            
+                        if (result == MessageBoxResult.OK)
+                        {
+                            DeleteConfigFileAndRestart();
+                        }
+                    }
+            
+                    private void DeleteConfigFileAndRestart()
+                    {
+            
+                        
+            
+                        try
+                        {
+                            string configFilePath = "config.txt";
+                            
+                            if (File.Exists(configFilePath))
+                            {
+                                File.Delete(configFilePath);
+                            }
+            
+                            string exePath = Process.GetCurrentProcess().MainModule.FileName;
+                            Process.Start(exePath);
+            
+                            Application.Current.Shutdown();
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show($"An error occurred: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                        }
+                    }
+            
+            
+            
+                    #region INotifyPropertyChanged Implementation
+                    public event PropertyChangedEventHandler PropertyChanged;
+                    protected void OnPropertyChanged(string propertyName)
+                    {
+                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+                    }
+                    #endregion
+            
+                    private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
+                    {
+                        this.WindowState = WindowState.Maximized;
+                        await ReadBlobFileAsync("data.csv");
+                    }
+            
+                    private void StartTestButton_Click(object sender, RoutedEventArgs e)
+                    {
+                        PreTestQuestionaire preTestWindow = new PreTestQuestionaire(this);
+                        preTestWindow.ShowDialog();
+                    }
+            
+                    private void ChangeStoreCodeButton_Click(object sender, RoutedEventArgs e)
+                    {
+                        ConfirmAndDeleteConfigFile();
+                    }
+            
+                    private void StoreCodeTextBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+                    {
+            
+                    }
+                }
+            }
+            </code></pre>
+            <p class="articleP">
+                The next pop up screen neeeded to confirm the customer carrying out the tests age and store this data before the test started.
             </p>
         </div>
     </body>

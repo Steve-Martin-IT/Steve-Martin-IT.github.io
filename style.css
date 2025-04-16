@@ -22,6 +22,7 @@
   .header{
     text-align: center;
     margin: 40px;
+    width: 100%;
   }
 
   .slideTextContainer{
@@ -52,6 +53,10 @@
     color: #fff;
     scroll-snap-align: start;
     position: relative;
+  }
+
+  .ArticleTitle{
+    color: white;
   }
 
   .slides h2{
@@ -99,6 +104,7 @@
 
   .slide3{
     background: linear-gradient(454deg, #66DBFF, #ADECFF);
+    width: 100%;
   }
 
   .slide4{
@@ -112,11 +118,13 @@
   }
 
   .photo{
-    width: 600px;
+    width: 30%;
+    height: auto;
   }
 
   .screenshot{
-    width: 900px;
+    width: 60%;
+    height: auto;
   }
 
   .pre {

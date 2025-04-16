@@ -12,12 +12,13 @@
   <body class="article">
     <div class="header">
         <a href="index.html">Back</a>
-        <h1>Automated Plant Watering System</h1>
+        <h1 class="ArticleTitle">Automated Plant Watering System</h1>
         <p class="articleP">
             I am terrible at keeping plants alive. From the early point of looking at sensors, motors and peripherals for Raspberry pi and some of the basic projects 
             that could be done I knew I wanted to create something that watered the plants I wanted to grow inside until they were ready to go outside. But I also knew 
             I wanted to take the basic system I saw in some of the examples and tutorials and build something more substantial and more end to end.
         </p>
+        <img class="screenshot" src="img/Design.png">
         <p class="articleP">
             The first steps were to get the soil sensors set up. As these were sending back an analogue signal these would need to be connected through an Analogue to Digital 
             converter for the Pi to be able to understand the signal. For this I found the MCP3008 chip which seemed to cover this without needing an additional board and allowing 
@@ -27,125 +28,125 @@
         <p class="articleP">
             I planned out the board structure for five capacitive soil sensors like this:
         </p>
-        <img src="">
+        <img class="screenshot" src="img/PiPinout.png">
         <p class="articleP">
             My next point was to look to get the scripts in place to read from the moisture meters. After quite a bit of looking around at a few different sources I eventually put 
             this script together to read the moisture level. 
         </p>
         <div class="code-block">
         <pre><code class="language-python">
-                import RPi.GPIO as GPIO
-                import datetime
-                import spidev
-                import time
-                import sqlite3
+        import RPi.GPIO as GPIO
+        import datetime
+        import spidev
+        import time
+        import sqlite3
 
-                spi = spidev.SpiDev()
-                spi.open(0,0)
-                spi.max_speed_hz = 1000000
+        spi = spidev.SpiDev()
+        spi.open(0,0)
+        spi.max_speed_hz = 1000000
 
-                def readData(channel):
-                    adc = spi.xfer2([1,(8+channel)&lt;&lt;4,0])
-                    data = ((adc[1]&3) &lt;&lt; 8) + adc[2]
-                    return data
+        def readData(channel):
+            adc = spi.xfer2([1,(8+channel)&lt;&lt;4,0])
+            data = ((adc[1]&3) &lt;&lt; 8) + adc[2]
+            return data
 
-                db_path = "/home/steve/Documents/Plants/soil_data.db"
+        db_path = "/home/steve/Documents/Plants/soil_data.db"
 
-                def insert_reading(sensor_id, moisture_level, moisture_percentage):
-                    conn = sqlite3.connect(db_path)
-                    cursor = conn.cursor()
-                    cursor.execute('''
-                        INSERT INTO soil_moisture (sensor_id, moisture_level, moisture_percentage)
-                        VALUES (?, ?, ?)
-                    ''', (sensor_id, moisture_level, moisture_percentage))
-                    conn.commit()
-                    conn.close()
-
-                GPIO.setwarnings(False)
-                GPIO.setmode(GPIO.BCM)
-
-                moisture1 = readData(0)
-                moisture2 = readData(1)
-                moisture3 = readData(2)
-                moisture4 = readData(3)
-
-                moisture1_percent = round((moisture1 - 330) / 450 * 100, 2)
-                moisture2_percent = round((moisture2 - 330) / 450 * 100, 2)
-                moisture3_percent = round((moisture3 - 330) / 450 * 100, 2)
-                moisture4_percent = round((moisture4 - 330) / 450 * 100, 2)
-
-                insert_reading("Bay 1", moisture1, moisture1_percent)
-                insert_reading("Bay 2", moisture2, moisture2_percent)
-                insert_reading("Bay 3", moisture3, moisture3_percent)
-                insert_reading("Bay 4", moisture4, moisture4_percent)
-
-                f = open("/home/steve/Documents/Plants/Log.txt", "a")  # Open in append mode
-                currentTime = datetime.datetime.now()
-                f.write(str(currentTime) + ":\n")
-                f.write("Detected Moisture in 1: " + str(moisture1_percent) + "\n")
-                f.write("Detected Moisture in 2: " + str(moisture2_percent) + "\n")
-                f.write("Detected Moisture in 3: " + str(moisture3_percent) + "\n")
-                f.write("Detected Moisture in 4: " + str(moisture4_percent) + "\n")
-                f.close()
-
-                GPIO.cleanup()
-            </code></pre>
-            </div>
-            <p class="articleP">
-                This is pulling back the reading from all four of the capacitive soil sensors I had connected, storing all of the results into a database 
-                and then recording all of the details of what was pulled into a log file. I then set up a CRON job to run the script every 15 minutes.
-            </p>
-            <p class="articleP">
-                With this all in place, I left this to run enough times for there to be some data in the database and then set up a simple API server to run 
-                via Flask. As this was staying encapsulated in my home network Flask seemed acceptable for now.
-            </p>
-            <div class="code-block">
-            <pre><code class="language-python">
-            from flask import Flask, jsonify
-            from flask_cors import CORS
-            import sqlite3
-
-            app =  Flask(__name__)
-            CORS(app)
-
-            DB_PATH = "/home/steve/Documents/Plants/soildata.db"
-
-            sensor_tables = [
-            "sensor_readings_1",
-            "sensor_readings_2",
-            "sensor_readings_3",
-            "sensor_readings_4",
-            "sensor_readings_5"
-            ]
-
-            @app.route('/moisture', methods=['GET'])
-            def get_moisture_data():
-            sensor_data = []
-                    
-            try:
-            conn = sqlite3.connect(DB_PATH)
+        def insert_reading(sensor_id, moisture_level, moisture_percentage):
+            conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
-                        
-            for table in sensor_tables:
-            query = f"SELECT moisture_value, timestamp FROM {table} ORDER by timestamp DESC LIMIT 1"
-            cursor.execute(query)
-            result = cursor.fetchone()
-                            
-            if result:
-            sensor_data.append({
-            "sensor_table": table,
-            "moisture_value": result[0],
-            "timestamp": result[1]
-            })
-                                
+            cursor.execute('''
+                INSERT INTO soil_moisture (sensor_id, moisture_level, moisture_percentage)
+                VALUES (?, ?, ?)
+            ''', (sensor_id, moisture_level, moisture_percentage))
+            conn.commit()
             conn.close()
-            except Exception as e:
-            return jsonify({"error": str(e)}), 500
-                    
-            return jsonify(sensor_data)
 
-            if __name__ == '__main__':
-            app.run(host='0.0.0.0', port=5000, debug=True)
+        GPIO.setwarnings(False)
+        GPIO.setmode(GPIO.BCM)
+
+        moisture1 = readData(0)
+        moisture2 = readData(1)
+        moisture3 = readData(2)
+        moisture4 = readData(3)
+
+        moisture1_percent = round((moisture1 - 330) / 450 * 100, 2)
+        moisture2_percent = round((moisture2 - 330) / 450 * 100, 2)
+        moisture3_percent = round((moisture3 - 330) / 450 * 100, 2)
+        moisture4_percent = round((moisture4 - 330) / 450 * 100, 2)
+
+        insert_reading("Bay 1", moisture1, moisture1_percent)
+        insert_reading("Bay 2", moisture2, moisture2_percent)
+        insert_reading("Bay 3", moisture3, moisture3_percent)
+        insert_reading("Bay 4", moisture4, moisture4_percent)
+
+        f = open("/home/steve/Documents/Plants/Log.txt", "a")  
+        currentTime = datetime.datetime.now()
+        f.write(str(currentTime) + ":\n")
+        f.write("Detected Moisture in 1: " + str(moisture1_percent) + "\n")
+        f.write("Detected Moisture in 2: " + str(moisture2_percent) + "\n")
+        f.write("Detected Moisture in 3: " + str(moisture3_percent) + "\n")
+        f.write("Detected Moisture in 4: " + str(moisture4_percent) + "\n")
+        f.close()
+
+        GPIO.cleanup()
+    </code></pre>
+    </div>
+    <p class="articleP">
+        This is pulling back the reading from all four of the capacitive soil sensors I had connected, storing all of the results into a database 
+        and then recording all of the details of what was pulled into a log file. I then set up a CRON job to run the script every 15 minutes.
+    </p>
+    <p class="articleP">
+        With this all in place, I left this to run enough times for there to be some data in the database and then set up a simple API server to run 
+        via Flask. As this was staying encapsulated in my home network Flask seemed acceptable for now.
+    </p>
+    <div class="code-block">
+    <pre><code class="language-python">
+    from flask import Flask, jsonify
+    from flask_cors import CORS
+    import sqlite3
+
+    app =  Flask(__name__)
+    CORS(app)
+
+    DB_PATH = "/home/steve/Documents/Plants/soildata.db"
+
+    sensor_tables = [
+    "sensor_readings_1",
+    "sensor_readings_2",
+    "sensor_readings_3",
+    "sensor_readings_4",
+    "sensor_readings_5"
+    ]
+
+    @app.route('/moisture', methods=['GET'])
+    def get_moisture_data():
+    sensor_data = []
+            
+    try:
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+                
+    for table in sensor_tables:
+    query = f"SELECT moisture_value, timestamp FROM {table} ORDER by timestamp DESC LIMIT 1"
+    cursor.execute(query)
+    result = cursor.fetchone()
+                    
+    if result:
+    sensor_data.append({
+    "sensor_table": table,
+    "moisture_value": result[0],
+    "timestamp": result[1]
+    })
+                        
+    conn.close()
+    except Exception as e:
+    return jsonify({"error": str(e)}), 500
+            
+    return jsonify(sensor_data)
+
+    if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
             </code></pre>
             </div>
             <p class="articleP">
@@ -162,253 +163,253 @@
             </p>
             <div class="code-block">
                 <pre><code class="language-csharp">
-            using System;
-            using System.Collections.ObjectModel;
-            using System.ComponentModel;
-            using System.Net.Http;
-            using System.Runtime.CompilerServices;
-            using System.Text.Json;
-            using System.Threading.Tasks;
-            using System.Timers;
-            using System.Windows.Media;
-            using LiveChartsCore;
-            using LiveChartsCore.SkiaSharpView;
-            using LiveChartsCore.SkiaSharpView.Drawing.Geometries;
-            using LiveChartsCore.SkiaSharpView.Painting;
-            using SkiaSharp;
+        using System;
+        using System.Collections.ObjectModel;
+        using System.ComponentModel;
+        using System.Net.Http;
+        using System.Runtime.CompilerServices;
+        using System.Text.Json;
+        using System.Threading.Tasks;
+        using System.Timers;
+        using System.Windows.Media;
+        using LiveChartsCore;
+        using LiveChartsCore.SkiaSharpView;
+        using LiveChartsCore.SkiaSharpView.Drawing.Geometries;
+        using LiveChartsCore.SkiaSharpView.Painting;
+        using SkiaSharp;
 
-            namespace Chinampa
+        namespace Chinampa
+        {
+        
+            public class DashboardViewModel : INotifyPropertyChanged
             {
-            
-                public class DashboardViewModel : INotifyPropertyChanged
+                private static readonly HttpClient httpClient = new HttpClient();
+                private System.Timers.Timer fetchTimer;
+
+                private double _sensor1Value;
+                public double Sensor1Value
                 {
-                    private static readonly HttpClient httpClient = new HttpClient();
-                    private System.Timers.Timer fetchTimer;
-
-                    private double _sensor1Value;
-                    public double Sensor1Value
+                    get => _sensor1Value;
+                    set
                     {
-                        get => _sensor1Value;
-                        set
-                        {
-                            _sensor1Value = value;
-                            OnPropertyChanged(nameof(Sensor1Value));
-                            OnPropertyChanged(nameof(Sensor1PieData)); 
-                        }
+                        _sensor1Value = value;
+                        OnPropertyChanged(nameof(Sensor1Value));
+                        OnPropertyChanged(nameof(Sensor1PieData)); 
                     }
-
-                    public IEnumerable<ISeries> Sensor1PieData => new ISeries[]
-                    {
-                        
-                        new PieSeries<double>
-                        {
-                            Values = new double[] { Sensor1Value },
-                            Name = "Sensor1 Value",
-                            Fill = new SolidColorPaint(SKColor.Parse("#fc85ba")), 
-                            InnerRadius = 0.3f
-                        },
-                        
-                        new PieSeries<double>
-                        {
-                            Values = new double[] { 100 - Sensor1Value },
-                            Name = "Remaining",
-                            Fill = new SolidColorPaint(SKColor.Parse("#555555")), 
-                            Stroke = new SolidColorPaint(SKColor.Parse("#00000000")), 
-                            InnerRadius = 0.3f
-                        }
-                    };
-
-                    private double _sensor2Value;
-                    public double Sensor2Value
-                    {
-                        get => _sensor2Value;
-                        set
-                        {
-                            _sensor2Value = value;
-                            OnPropertyChanged(nameof(Sensor2Value));
-                            OnPropertyChanged(nameof(Sensor2PieData)); 
-                        }
-                    }
-
-                    public IEnumerable<ISeries> Sensor2PieData => new ISeries[]
-                    {
-                        // Sensor1 Pie Slice
-                        new PieSeries<double>
-                        {
-                            Values = new double[] { Sensor2Value },
-                            Name = "Sensor2 Value",
-                            Fill = new SolidColorPaint(SKColor.Parse("#fc85ba")), 
-                            InnerRadius = 0.3f
-                        },
-                        // Remaining Pie Slice (100 - Sensor1)
-                        new PieSeries<double>
-                        {
-                            Values = new double[] { 100 - Sensor2Value },
-                            Name = "Remaining",
-                            Fill = new SolidColorPaint(SKColor.Parse("#555555")), 
-                            Stroke = new SolidColorPaint(SKColor.Parse("#00000000")), 
-                            InnerRadius = 0.3f
-                        }
-                    };
-
-                    private double _sensor3Value;
-                    public double Sensor3Value
-                    {
-                        get => _sensor3Value;
-                        set
-                        {
-                            _sensor3Value = value;
-                            OnPropertyChanged(nameof(Sensor3Value));
-                            OnPropertyChanged(nameof(Sensor3PieData)); // Notify UI
-                        }
-                    }
-
-                    public IEnumerable<ISeries> Sensor3PieData => new ISeries[]
-                    {
-                        
-                        new PieSeries<double>
-                        {
-                            Values = new double[] { Sensor3Value },
-                            Name = "Sensor2 Value",
-                            Fill = new SolidColorPaint(SKColor.Parse("#fc85ba")), 
-                            InnerRadius = 0.3f
-                        },
-                        
-                        new PieSeries<double>
-                        {
-                            Values = new double[] { 100 - Sensor3Value },
-                            Name = "Remaining",
-                            Fill = new SolidColorPaint(SKColor.Parse("#555555")), 
-                            Stroke = new SolidColorPaint(SKColor.Parse("#00000000")), 
-                            InnerRadius = 0.3f
-                        }
-                    };
-
-                    private double _sensor4Value;
-                    public double Sensor4Value
-                    {
-                        get => _sensor4Value;
-                        set
-                        {
-                            _sensor4Value = value;
-                            OnPropertyChanged(nameof(Sensor4Value));
-                            OnPropertyChanged(nameof(Sensor4ArcPath)); // Notify UI
-                        }
-                    }
-
-                    private double _sensor5Value;
-                    public double Sensor5Value
-                    {
-                        get => _sensor5Value;
-                        set
-                        {
-                            _sensor5Value = value;
-                            OnPropertyChanged(nameof(Sensor5Value));
-                            OnPropertyChanged(nameof(Sensor5ArcPath)); // Notify UI
-                        }
-                    }
-
-                    public IEnumerable<double> Sensor1Values => new double[] { Sensor1Value };
-
-                    public string Sensor1ArcPath => CalculateArcPath(Sensor1Value / 100);
-                    public string Sensor2ArcPath => CalculateArcPath(Sensor2Value / 100);
-                    public string Sensor3ArcPath => CalculateArcPath(Sensor3Value / 100);
-                    public string Sensor4ArcPath => CalculateArcPath(Sensor4Value / 100);
-                    public string Sensor5ArcPath => CalculateArcPath(Sensor5Value / 100);
-
-                    
-
-                    private string CalculateArcPath(double percentage)
-                    {
-                        
-                        double startAngle = Math.PI; 
-
-                        
-                        double endAngle = startAngle + (Math.PI * percentage); 
-
-                        
-                        double startX = 50 + (40 * Math.Cos(startAngle)); 
-                        double startY = 50 + (40 * Math.Sin(startAngle)); 
-                        double endX = 50 + (40 * Math.Cos(endAngle)); 
-                        double endY = 50 + (40 * Math.Sin(endAngle)); 
-
-                        
-                        int largeArcFlag = percentage >= 0.5 ? 1 : 0;
-
-                        
-                        return $"M {startX},{startY} A 40,40 0 {largeArcFlag},1 {endX},{endY}";
-                    }
-
-
-
-
-
-                    public event PropertyChangedEventHandler PropertyChanged;
-                    protected void OnPropertyChanged([CallerMemberName] string name = null) =>
-                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-
-                    public DashboardViewModel()
-                    {
-                        StartTimer();
-                    }
-
-                    private void StartTimer()
-                    {
-                        fetchTimer = new System.Timers.Timer(1000); 
-                        fetchTimer.Elapsed += async (sender, e) => await CheckAndFetchData();
-                        fetchTimer.Start();
-                    }
-
-                    private async Task CheckAndFetchData()
-                    {
-                        int currentMinute = DateTime.Now.Minute;
-                        if (currentMinute == 1 || currentMinute == 16 || currentMinute == 31 || currentMinute == 46)
-                        {
-                            await FetchSensorData();
-                        }
-                    }
-
-                    private async Task FetchSensorData()
-                    {
-                        try
-                        {
-                            string apiUrl = "http://192.168.1.194:5000/moisture";
-                            var response = await httpClient.GetAsync(apiUrl);
-                            response.EnsureSuccessStatusCode();
-
-                            string responseBody = await response.Content.ReadAsStringAsync();
-                            var sensorData = JsonSerializer.Deserialize<ObservableCollection<SensorReading>>(responseBody);
-
-                            if (sensorData != null && sensorData.Count >= 5)
-                            {
-                                Sensor1Value = sensorData[0].moisture_value;
-                                Sensor2Value = sensorData[1].moisture_value;
-                                Sensor3Value = sensorData[2].moisture_value;
-                                Sensor4Value = sensorData[3].moisture_value;
-                                Sensor5Value = sensorData[4].moisture_value;
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"Error fetching sensor data: {ex.Message}");
-                        }
-                    }
-                    
-
                 }
+
+                public IEnumerable<ISeries> Sensor1PieData => new ISeries[]
+                {
+                    
+                    new PieSeries<double>
+                    {
+                        Values = new double[] { Sensor1Value },
+                        Name = "Sensor1 Value",
+                        Fill = new SolidColorPaint(SKColor.Parse("#fc85ba")), 
+                        InnerRadius = 0.3f
+                    },
+                    
+                    new PieSeries<double>
+                    {
+                        Values = new double[] { 100 - Sensor1Value },
+                        Name = "Remaining",
+                        Fill = new SolidColorPaint(SKColor.Parse("#555555")), 
+                        Stroke = new SolidColorPaint(SKColor.Parse("#00000000")), 
+                        InnerRadius = 0.3f
+                    }
+                };
+
+                private double _sensor2Value;
+                public double Sensor2Value
+                {
+                    get => _sensor2Value;
+                    set
+                    {
+                        _sensor2Value = value;
+                        OnPropertyChanged(nameof(Sensor2Value));
+                        OnPropertyChanged(nameof(Sensor2PieData)); 
+                    }
+                }
+
+                public IEnumerable<ISeries> Sensor2PieData => new ISeries[]
+                {
+                    // Sensor1 Pie Slice
+                    new PieSeries<double>
+                    {
+                        Values = new double[] { Sensor2Value },
+                        Name = "Sensor2 Value",
+                        Fill = new SolidColorPaint(SKColor.Parse("#fc85ba")), 
+                        InnerRadius = 0.3f
+                    },
+                    // Remaining Pie Slice (100 - Sensor1)
+                    new PieSeries<double>
+                    {
+                        Values = new double[] { 100 - Sensor2Value },
+                        Name = "Remaining",
+                        Fill = new SolidColorPaint(SKColor.Parse("#555555")), 
+                        Stroke = new SolidColorPaint(SKColor.Parse("#00000000")), 
+                        InnerRadius = 0.3f
+                    }
+                };
+
+                private double _sensor3Value;
+                public double Sensor3Value
+                {
+                    get => _sensor3Value;
+                    set
+                    {
+                        _sensor3Value = value;
+                        OnPropertyChanged(nameof(Sensor3Value));
+                        OnPropertyChanged(nameof(Sensor3PieData)); // Notify UI
+                    }
+                }
+
+                public IEnumerable<ISeries> Sensor3PieData => new ISeries[]
+                {
+                    
+                    new PieSeries<double>
+                    {
+                        Values = new double[] { Sensor3Value },
+                        Name = "Sensor2 Value",
+                        Fill = new SolidColorPaint(SKColor.Parse("#fc85ba")), 
+                        InnerRadius = 0.3f
+                    },
+                    
+                    new PieSeries<double>
+                    {
+                        Values = new double[] { 100 - Sensor3Value },
+                        Name = "Remaining",
+                        Fill = new SolidColorPaint(SKColor.Parse("#555555")), 
+                        Stroke = new SolidColorPaint(SKColor.Parse("#00000000")), 
+                        InnerRadius = 0.3f
+                    }
+                };
+
+                private double _sensor4Value;
+                public double Sensor4Value
+                {
+                    get => _sensor4Value;
+                    set
+                    {
+                        _sensor4Value = value;
+                        OnPropertyChanged(nameof(Sensor4Value));
+                        OnPropertyChanged(nameof(Sensor4ArcPath)); // Notify UI
+                    }
+                }
+
+                private double _sensor5Value;
+                public double Sensor5Value
+                {
+                    get => _sensor5Value;
+                    set
+                    {
+                        _sensor5Value = value;
+                        OnPropertyChanged(nameof(Sensor5Value));
+                        OnPropertyChanged(nameof(Sensor5ArcPath)); // Notify UI
+                    }
+                }
+
+                public IEnumerable<double> Sensor1Values => new double[] { Sensor1Value };
+
+                public string Sensor1ArcPath => CalculateArcPath(Sensor1Value / 100);
+                public string Sensor2ArcPath => CalculateArcPath(Sensor2Value / 100);
+                public string Sensor3ArcPath => CalculateArcPath(Sensor3Value / 100);
+                public string Sensor4ArcPath => CalculateArcPath(Sensor4Value / 100);
+                public string Sensor5ArcPath => CalculateArcPath(Sensor5Value / 100);
 
                 
 
-                public class SensorReading
+                private string CalculateArcPath(double percentage)
                 {
-                    public double moisture_value { get; set; }
-                    public string sensor_table { get; set; }
-                    public string timestamp { get; set; }
+                    
+                    double startAngle = Math.PI; 
+
+                    
+                    double endAngle = startAngle + (Math.PI * percentage); 
+
+                    
+                    double startX = 50 + (40 * Math.Cos(startAngle)); 
+                    double startY = 50 + (40 * Math.Sin(startAngle)); 
+                    double endX = 50 + (40 * Math.Cos(endAngle)); 
+                    double endY = 50 + (40 * Math.Sin(endAngle)); 
+
+                    
+                    int largeArcFlag = percentage >= 0.5 ? 1 : 0;
+
+                    
+                    return $"M {startX},{startY} A 40,40 0 {largeArcFlag},1 {endX},{endY}";
                 }
 
 
 
+
+
+                public event PropertyChangedEventHandler PropertyChanged;
+                protected void OnPropertyChanged([CallerMemberName] string name = null) =>
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
+                public DashboardViewModel()
+                {
+                    StartTimer();
+                }
+
+                private void StartTimer()
+                {
+                    fetchTimer = new System.Timers.Timer(1000); 
+                    fetchTimer.Elapsed += async (sender, e) => await CheckAndFetchData();
+                    fetchTimer.Start();
+                }
+
+                private async Task CheckAndFetchData()
+                {
+                    int currentMinute = DateTime.Now.Minute;
+                    if (currentMinute == 1 || currentMinute == 16 || currentMinute == 31 || currentMinute == 46)
+                    {
+                        await FetchSensorData();
+                    }
+                }
+
+                private async Task FetchSensorData()
+                {
+                    try
+                    {
+                        string apiUrl = "http://192.168.1.194:5000/moisture";
+                        var response = await httpClient.GetAsync(apiUrl);
+                        response.EnsureSuccessStatusCode();
+
+                        string responseBody = await response.Content.ReadAsStringAsync();
+                        var sensorData = JsonSerializer.Deserialize<ObservableCollection<SensorReading>>(responseBody);
+
+                        if (sensorData != null && sensorData.Count >= 5)
+                        {
+                            Sensor1Value = sensorData[0].moisture_value;
+                            Sensor2Value = sensorData[1].moisture_value;
+                            Sensor3Value = sensorData[2].moisture_value;
+                            Sensor4Value = sensorData[3].moisture_value;
+                            Sensor5Value = sensorData[4].moisture_value;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error fetching sensor data: {ex.Message}");
+                    }
+                }
+                
+
             }
+
+            
+
+            public class SensorReading
+            {
+                public double moisture_value { get; set; }
+                public string sensor_table { get; set; }
+                public string timestamp { get; set; }
+            }
+
+
+
+        }
                 </code></pre>
                 <pre><code class="language-csharp">
     using System.Collections.ObjectModel;
@@ -545,23 +546,23 @@
             </p>
             <div class="code-block">
                 <pre><code class="language-python">
-    import RPi.GPIO as GPIO
-    import time
+            import RPi.GPIO as GPIO
+            import time
 
-    GPIO.setmode(GPIO.BCM)
-    PUMP_PIN = 4
+            GPIO.setmode(GPIO.BCM)
+            PUMP_PIN = 4
 
-    GPIO.setup(PUMP_PIN, GPIO.OUT)
+            GPIO.setup(PUMP_PIN, GPIO.OUT)
 
-    try:
-        print("Turning pump ON!")
-        GPIO.output(PUMP_PIN, GPIO.HIGH)
-        time.sleep(5)
-        print("Turning Pump OFF!")
-        GPIO.output(PUMP_PIN, GPIO.LOW)
-    finally:
-        GPIO.cleanup()
-        print("GPIO cleanup done")
+            try:
+                print("Turning pump ON!")
+                GPIO.output(PUMP_PIN, GPIO.HIGH)
+                time.sleep(5)
+                print("Turning Pump OFF!")
+                GPIO.output(PUMP_PIN, GPIO.LOW)
+            finally:
+                GPIO.cleanup()
+                print("GPIO cleanup done")
                 </code></pre>
             </div>
             <p class="articleP">    

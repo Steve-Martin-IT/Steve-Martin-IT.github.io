@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Hearing Screener Application</title>
+        <link rel="stylesheet" href="style.css">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-csharp.min.js"></script>
+    </head>
+    <body class="article">
+        <div class="header">
+            <a class="back" href="index.html">Back</a>
+            <h1 class="ArticleTitle">Web Activity Digest Extensiohn</h1>
+            <p class="articleP">
+                I spend a lot of time on the internet, like anybody. But I often feel by the end of a day spent on the internet I don't have a very clear view of 
+                what it is that I have done and what it is that I have achieved on the internet.
+            </p>
+            <p class="articleP">
+                As such I wanted to be able to build a browser extension that would track the pages I have visited in a day and give me a digest of my daily activity.
+            </p>
+            <p class="articleP">
+                I also wanted this to be the catalyst for a general online assistant that could help me stay focused on tasks, to be sure I deal with emails that I need 
+                to deal with and to help use the daily digest to help keep me on track with projects I’m working on.
+            </p>
+            <p class="articleP">
+                From this I set out an architecture that would record pages being viewed via the extension and record them into a database. It would also take a text capture 
+                of the full site and store this in a Minio S3 bucket on a logging server. The logging server would also contain a database of known websites with categorisation 
+                information about them which could be cross-referenced against to update each row in the pages database.
+            </p>
+            <img class="screenshot" src="ExtensionDesign.png">
+            <p class="articleP">
+                All of this could then be extracted to an analysis server that could review any gaps in categorisation and through Deep Learning and Machine learning understand 
+                what any unknown websites are for and be able to update content back into the logging server.
+            </p>
+            <p class="articleP">
+                I began putting together the basic infrastructure required for this and decided to push into the first big task, which was to find a source for the known_sites 
+                and to make it usable data. Having found the Tranco database of the 500,000 most used websites, I found this a good place to start. However, this needed a lot 
+                of cleaning to turn it into something that I could use in any way. 
+            </p>
+            <pre><code class="language-python">
+                import pandas as pd
+import tldextract
+import requests
+import re
+
+df = pd.read_csv("tranco_list.csv", names=["rank", "domain"])
+
+def normalize_domain(domain):
+    extracted = tldextract.extract(domain)
+    return f"{extracted.domain}.{extracted.suffix}"
+
+df["normalized_domain"] = df["domain"].apply(normalize_domain)
+
+df = df.drop_duplicates(subset="normalized_domain", keep="first")
+
+cdn_providers = ["cloudflare.com", "akamai.com", "fastly.net", "edgekey.net"]
+df = df[~df["normalized_domain"].isin(cdn_providers)]
+
+api_keywords = ["api", "cdn", "static", "edge", "service", "dns", "akamai", "fastly"]
+df = df[~df["normalized_domain"].str.contains("|".join(api_keywords), na=False)]
+
+# Create a list of inappropriate words (this will need ongoing refinement)
+bad_keywords = ["", "xxx", "adult", "gambling", "casino", "betting", "escort"]
+
+def is_inappropriate(domain):
+    return any(re.search(rf"\b{kw}\b", domain, re.IGNORECASE) for kw in bad_keywords)
+
+df = df[~df["normalized_domain"].apply(is_inappropriate)]
+
+df[["rank", "normalized_domain"]].to_csv("cleaned_tranco_list.csv", index=False)
+            </code></pre>
+            <p class="articleP">
+
+            </p>
+            <p class="articleP">
+
+            </p>
+            <p class="articleP">
+
+            </p>
+        </div>
+    </body>
+</html>

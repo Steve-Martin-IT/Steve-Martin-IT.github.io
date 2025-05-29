@@ -28,92 +28,84 @@
                 crawling. With all of that in mind the first place I decided to start reviewing for this was a site called Welcome to the Jungle; formerly known as Otta. 
             </p>
             <p class="articleP">
-                The first point was to try and run a script that could pull out the job adverts. This was going to take a bit more than what I had learnt in a course about web scraping
+                The first point was to try and run a script that could pull out the companies using the site. This was going to take a bit more than what I had learnt in a course about web scraping
                 so I had some time researching how this could be done in the imediate.
             </p>
-            <pre><code class="language-csharp">
-            import time
-            import random
-            import re
-            import json
-            from selenium import webdriver
-            from selenium.webdriver.common.by import By
-            from bs4 import BeautifulSoup
-            import undetected_chromedriver as uc
+            <pre><code class="language-python">
+                import time
+                import random
+                import json
+                import undetected_chromedriver as uc
+                from selenium.webdriver.common.by import By
+                from selenium.webdriver.support.ui import WebDriverWait
+                from selenium.webdriver.support import expected_conditions as EC
 
-            def human_delay(min_seconds=1.5, max_seconds=3.5):
-                time.sleep(random.uniform(min_seconds, max_seconds))
+                def human_delay(min_seconds=1.5, max_seconds=3.5):
+                    time.sleep(random.unifor,(min_seconds, max_seconds))
 
-            def init_driver():
-                options = uc.ChromeOptions()
-                options.headless = True
-                driver = uc.Chrome(options=options)
-                return driver
+                def init_driver()
+                    options = uc.ChromeOptions()
+                    options.add_argument("--window-size=1200,800")
+                    options.headless = True 
+                    return uc.Chrome(options=options)
 
-            def load_all_companies(driver, url="https://app.welcometothejungle.com/companies"):
-                driver.get(url)
-                time.sleep(5)
+                def scroll_to_bottom(driver, max_attempts=20):
+                    last_height = driver.execute_script("return document.body.scrollHeight")
+                    attempts = 0
+                    scroll_count = 0
 
-                last_height = driver.execute_script("return document.body.scrollHeight")
-                scroll_attempts = 0
+                    while attempts < max_attempts:
+                        driver.execute_script("window.ScrollTo(0, document.body.scrollHeight);")
+                        time.sleep(random.uniform(1.0, 2.0))
+                        new_height =- driver.execute_script("return document.body.scrollHeight")
+                        scroll_count += 1
+                        print(f"Scrolled {scroll_count} time...", end="\r")
+                        if new_height == last_height:
+                            attempts += 1
+                        else:
+                            attempts = 0
+                        last_height = new_height
 
-                while scroll_attempts < 20:
-                    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                    time.sleep(random.uniform(1, 2.5))
-                    new_height = driver.execute_script("return document.body.scrollHeight")
-                    if new_height == last_height:
-                        scroll_attempts += 1
-                    else:
-                        scroll_attempts = 0
-                    last_height = new_height
+                    print(f"\n Scrolling Complete after {scroll_count} scrolls.")
 
-                soup = BeautifulSoup(driver.page_source, "html.parser")
-                links = set()
-                for a in soup.find_all("a", href=True):
-                    href = a["href"]
-                    if href.startswith("/companies/") and "/jobs" not in href:
-                        full_link = "https://app.welcometothejungle.com" + href
-                        links.add(full_link)
-                return list(links)
+                def extract_company_links(driver)
+                    anchors = driver.find_elements(By.TAG_NAME, "a")
+                    links = set()
+                    for a in anchors:
+                        try:
+                            href = a.get_attribute("href")
+                            if href and "/companies/" in href and "/jobs/" not in href:
+                                links.add(href.split("?")[0])
+                        except:
+                            continue
+                    return sorted(links)
 
-            def extract_job_links(driver, company_url):
-                driver.get(company_url)
-                time.sleep(3)
-                soup = BeautifulSoup(driver.page_source, "html.parser")
-                job_links = set()
+                def save_links(links, filename="companies.json"):
+                    with open(filename, "w") as f:
+                        json.dump(links, f, indent=2)
 
-                for a in soup.find_all("a", href=True):
-                    href = a["href"]
-                    if re.match(r"^/jobs/[a-zA-Z0-9]{8}$", href):
-                        job_links.add("https://app.welcometothejungle.com" + href)
-                return list(job_links)
+                if __name__ == "__main__":
+                    driver = init_driver()
+                    try:
+                        print("Loading companies page...")
+                        driver.get("https://app.welcometothejungle.com/companies")
+                        WebDriverWait(driver, 10).until(
+                            EC.presence_of_element_located((By.TAG_NAME, "a"))
+                        )
 
-            def save_to_json(data, filename="job_links.json"):
-                with open(filename, "w") as f:
-                    json.dump(data, f, indent=2)
+                        print("Scrolling to Load all companies")
+                        scroll_to_bottom(driver)
 
-            if __name__ == "__main__":
-                driver = init_driver()
+                        print("Extracting links...")
+                        company_links = extract_company_links(driver)
+                        print(f"Found {len(company_links)} companies.")
 
-                try:
-                    print("Loading all companies...")
-                    company_links = load_all_companies(driver)
-                    print(f"Found {len(company_links)} companies.")
+                        save_links(company_links)
+                        print("Saved to companies.json")
 
-                    results = {}
-                    for idx, company_url in enumerate(company_links):
-                        print(f"[{idx + 1}/{len(company_links)}] Scraping: {company_url}")
-                        job_links = extract_job_links(driver, company_url)
-                        if job_links:
-                            results[company_url] = job_links
-                        human_delay()
-
-                    print(f"Saving {sum(len(v) for v in results.values())} job links...")
-                    save_to_json(results)
-
-                finally:
-                    driver.quit()
-                    print("Done.")
+                    finally:
+                        driver.quit()
+                        print("Done!")
             </code></pre>
             <p class="articleP">
                 

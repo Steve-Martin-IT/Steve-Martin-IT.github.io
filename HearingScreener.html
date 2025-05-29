@@ -338,7 +338,7 @@ namespace Hearing_Screener
         private string GetSelectedCheckboxOption()
         {
             // Find the selected RadioButton
-            foreach (RadioButton radioButton in RadioButtonPanel.Children.OfType<RadioButton>())
+            foreach (RadioButton radioButton in RadioButtonPanel.Children.OfType&lt;RadioButton&gt;())
             {
                 if (radioButton.IsChecked == true)
                 {
@@ -434,7 +434,7 @@ namespace Hearing_Screener
         //timer to use as part of detecting if button is pressed whilst sound is playing
         private Timer soundTimer;
         //The variables that confirm if the button was pressed whilst each sound was playing
-        private List<bool> soundButtonPresses = new List<bool>();
+        private List&lt;bool> soundButtonPresses = new List&lt;bool&gt;();
 
         //Load the Window
         public TestWindow()
@@ -443,7 +443,7 @@ namespace Hearing_Screener
             //A reference to this window to allow it to run maximised
             this.Loaded += TestWindow_Loaded;
             //set all of the results to false
-            for (int i = 0; i < soundFiles.Length; i++)
+            for (int i = 0; i &lt; soundFiles.Length; i++)
             {
                 soundButtonPresses.Add(false);
             }
@@ -487,7 +487,7 @@ namespace Hearing_Screener
             
 
             // Loop to play all the sounds one after another, currently set up to play 32 sounds then exit the loop!!!
-            for (int i = 0; i < 32; i++)
+            for (int i = 0; i &lt; 32; i++)
             {
                 // Generate a random delay between 5 and 12 seconds
                 Random random = new Random();
@@ -544,7 +544,7 @@ namespace Hearing_Screener
         private void DebugPrintButtonPresses()
         {
             Console.WriteLine("Button Presses:");
-            for (int i = 0; i < soundButtonPresses.Count; i++)
+            for (int i = 0; i &lt; soundButtonPresses.Count; i++)
             {
                 Console.WriteLine($"Sound {i + 1}: {(soundButtonPresses[i] ? "Pressed" : "Not Pressed")}");
             }
@@ -601,7 +601,7 @@ namespace Hearing_Screener
 
         public class SoundButtonData
         {
-            public List<bool> SoundButtonPresses { get; set; }
+            public List&lt;bool&gt; SoundButtonPresses { get; set; }
         }
 
 
@@ -648,7 +648,7 @@ namespace Hearing_Screener
         private readonly string blobUrl = "https://stem4audioscreenertst001.blob.core.windows.net/data";
         private readonly string sasToken = "sv=2022-11-02&ss=bfqt&srt=sco&sp=rwlacupitfx&se=2025-02-13T22:21:02Z&st=2024-08-13T13:21:02Z&spr=https&sig=tpDANQhRXTfsDmDUBVw%2Bo4LkJbuHiac0Pt3I6YTq5aM%3D"; 
 
-        public ResultsWindow(List<bool> soundButtonPresses)
+        public ResultsWindow(List&lt;bool&gt; soundButtonPresses)
         {
             
             InitializeComponent();
@@ -693,7 +693,7 @@ namespace Hearing_Screener
             this.WindowState = WindowState.Maximized;
         }
 
-        private bool IsTestSuccessful(List<bool> soundButtonPresses)
+        private bool IsTestSuccessful(List&lt;bool&gt; soundButtonPresses)
         {
             // If any sound button press is false, the test is a failure
             return soundButtonPresses.All(pressed => pressed);
